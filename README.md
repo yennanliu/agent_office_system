@@ -145,6 +145,12 @@ GMAIL_APP_PASSWORD=xxxx-xxxx-xxxx-xxxx
 3. Create an App Password (select app: **Mail**, device: **Other**)
 4. Copy the 16-character password into `.env` as `GMAIL_APP_PASSWORD`
 
+```
+The only setup needed: enable 2-Step Verification on your Google account, then generate an App Password at
+myaccount.google.com/apppasswords — no Azure portal, no OAuth2 consent flow.
+```
+
+
 > No OAuth2 flow or API console required — App Password works with standard SMTP/IMAP.
 
 ### `src/agent_office/config/schedule.yaml` — cron jobs
