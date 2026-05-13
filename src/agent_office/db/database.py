@@ -1,10 +1,10 @@
 import sqlite3
 from contextlib import contextmanager
 from datetime import datetime, timezone
+from enum import StrEnum
 from pathlib import Path
 from typing import Any
 
-# Stored at project root (next to pyproject.toml)
 DB_PATH = Path(__file__).parent.parent.parent.parent / "runs.db"
 
 _CREATE_TABLE = """
@@ -25,6 +25,12 @@ CREATE TABLE IF NOT EXISTS runs (
 """
 
 
+class RunStatus(StrEnum):
+    RUNNING = "running"
+    SUCCESS = "success"
+    FAILED = "failed"
+
+
 @contextmanager
 def _conn():
     con = sqlite3.connect(DB_PATH)
@@ -32,6 +38,9 @@ def _conn():
     try:
         yield con
         con.commit()
+    except Exception:
+        con.rollback()
+        raise
     finally:
         con.close()
 
@@ -46,7 +55,7 @@ def insert_run(name: str, job_type: str, agents: list[str]) -> int:
     with _conn() as con:
         cur = con.execute(
             "INSERT INTO runs (name, job_type, agents, started_at, status) VALUES (?,?,?,?,?)",
-            (name, job_type, ", ".join(agents), _now(), "running"),
+            (name, job_type, ", ".join(agents), _now(), RunStatus.RUNNING),
         )
         return cur.lastrowid
 
@@ -54,7 +63,7 @@ def insert_run(name: str, job_type: str, agents: list[str]) -> int:
 def update_run(
     run_id: int,
     *,
-    status: str,
+    status: RunStatus,
     total_tokens: int = 0,
     prompt_tokens: int = 0,
     completion_tokens: int = 0,
