@@ -32,8 +32,8 @@ Multi-agent office automation built on **CrewAI**, **OpenAI GPT-4o**, and **Micr
                 ▼
           Tools (API wrappers)
      ┌────────────────────────────────────────┐
-     │ OutlookSendTool   Microsoft Graph API  │
-     │ OutlookReadTool   (OAuth2 client cred) │
+     │ GmailSendTool     Gmail SMTP           │
+     │ GmailReadTool     Gmail IMAP           │
      │ DocReaderTool     PDF / DOCX / TXT     │
      │ CronTool          APScheduler          │
      └────────────────────────────────────────┘
@@ -60,8 +60,8 @@ Multi-agent office automation built on **CrewAI**, **OpenAI GPT-4o**, and **Micr
 | `crews/email_crew.py` | `EmailCrew.run(to, subject, intent)` | Draft + send an Outlook email from a natural language intent |
 | `crews/doc_summary_crew.py` | `DocSummaryCrew.run(doc_path, recipients, notes)` | Read a document, summarize it, and email the summary |
 | `crews/scheduler_crew.py` | `SchedulerCrew.start()` | Load `schedule.yaml` and start background cron jobs |
-| `tools/outlook_tool.py` | `OutlookSendTool` | Send email via Microsoft Graph API |
-| `tools/outlook_tool.py` | `OutlookReadTool` | Read inbox messages via Microsoft Graph API |
+| `tools/gmail_tool.py` | `GmailSendTool` | Send email via Gmail SMTP |
+| `tools/gmail_tool.py` | `GmailReadTool` | Read inbox messages via Gmail IMAP |
 | `tools/doc_reader_tool.py` | `DocReaderTool` | Extract text from PDF, DOCX, TXT (local path or URL) |
 | `tools/cron_tool.py` | `register_job`, `start_scheduler` | APScheduler wrappers used by `SchedulerCrew` |
 
@@ -131,14 +131,21 @@ uv run pytest tests/ -v
 # OpenAI
 OPENAI_API_KEY=sk-...
 
-# Microsoft Graph API (OAuth2 — client credentials flow)
-OUTLOOK_CLIENT_ID=<Azure app client ID>
-OUTLOOK_CLIENT_SECRET=<Azure app client secret>
-OUTLOOK_TENANT_ID=<Azure AD tenant ID>
-OUTLOOK_USER_EMAIL=you@company.com
+# Gmail (SMTP + IMAP via App Password)
+GMAIL_ADDRESS=you@gmail.com
+GMAIL_APP_PASSWORD=xxxx-xxxx-xxxx-xxxx
 ```
 
 > `.env` is never committed. Add it to `.gitignore`.
+
+### Gmail App Password setup
+
+1. Enable **2-Step Verification** on your Google account
+2. Go to [myaccount.google.com/apppasswords](https://myaccount.google.com/apppasswords)
+3. Create an App Password (select app: **Mail**, device: **Other**)
+4. Copy the 16-character password into `.env` as `GMAIL_APP_PASSWORD`
+
+> No OAuth2 flow or API console required — App Password works with standard SMTP/IMAP.
 
 ### `src/agent_office/config/schedule.yaml` — cron jobs
 
@@ -166,10 +173,3 @@ jobs:
 
 **Supported crew values:** `EmailCrew`, `DocSummaryCrew`
 
-### Outlook API setup (Azure)
-
-1. Register an app in [Azure Portal](https://portal.azure.com) → **App registrations**
-2. Add **Microsoft Graph** API permissions: `Mail.Send`, `Mail.Read` (Application type)
-3. Grant admin consent
-4. Create a client secret → copy to `.env`
-5. Note the **Application (client) ID** and **Directory (tenant) ID** → copy to `.env`

@@ -1,7 +1,5 @@
 """Unit tests for tools — run with: uv run pytest tests/"""
 import os
-import tempfile
-from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -31,21 +29,34 @@ class TestDocReaderTool:
         assert "not found" in result
 
 
-# ── OutlookSendTool ───────────────────────────────────────────────────────────
+# ── GmailSendTool ─────────────────────────────────────────────────────────────
 
-class TestOutlookSendTool:
+class TestGmailSendTool:
     def setup_method(self):
-        from agent_office.tools.outlook_tool import OutlookSendTool
-        self.tool = OutlookSendTool()
+        from agent_office.tools.gmail_tool import GmailSendTool
+        self.tool = GmailSendTool()
 
-    @patch("agent_office.tools.outlook_tool._get_access_token", return_value="fake-token")
-    @patch("agent_office.tools.outlook_tool.httpx.post")
-    def test_send_email_success(self, mock_post, mock_token, monkeypatch):
-        monkeypatch.setenv("OUTLOOK_USER_EMAIL", "sender@example.com")
-        mock_resp = MagicMock()
-        mock_resp.raise_for_status = MagicMock()
-        mock_post.return_value = mock_resp
+    @patch("agent_office.tools.gmail_tool.smtplib.SMTP")
+    def test_send_email_success(self, mock_smtp_cls, monkeypatch):
+        monkeypatch.setenv("GMAIL_ADDRESS", "sender@gmail.com")
+        monkeypatch.setenv("GMAIL_APP_PASSWORD", "test-app-password")
 
-        result = self.tool._run(to="a@b.com", subject="Test", body="Hello")
+        mock_server = MagicMock()
+        mock_smtp_cls.return_value.__enter__ = MagicMock(return_value=mock_server)
+        mock_smtp_cls.return_value.__exit__ = MagicMock(return_value=False)
+
+        result = self.tool._run(to="recipient@gmail.com", subject="Test", body="Hello")
         assert "sent successfully" in result
-        assert "a@b.com" in result
+        assert "recipient@gmail.com" in result
+
+    @patch("agent_office.tools.gmail_tool.smtplib.SMTP")
+    def test_send_email_with_cc(self, mock_smtp_cls, monkeypatch):
+        monkeypatch.setenv("GMAIL_ADDRESS", "sender@gmail.com")
+        monkeypatch.setenv("GMAIL_APP_PASSWORD", "test-app-password")
+
+        mock_server = MagicMock()
+        mock_smtp_cls.return_value.__enter__ = MagicMock(return_value=mock_server)
+        mock_smtp_cls.return_value.__exit__ = MagicMock(return_value=False)
+
+        result = self.tool._run(to="a@gmail.com", subject="Test", body="Hi", cc="b@gmail.com")
+        assert "sent successfully" in result

@@ -3,14 +3,14 @@
 # This file documents the agent design for reference.
 
 email_agent:
-  role: Outlook Email Assistant
-  goal: Compose and send emails via Outlook accurately and professionally on behalf of the user
+  role: Gmail Email Assistant
+  goal: Compose and send emails via Gmail accurately and professionally on behalf of the user
   backstory: >
-    A corporate email assistant with full access to the Outlook mailbox.
+    An email assistant with full access to the Gmail account.
     Drafts clear, professional emails and handles all correspondence reliably.
   tools:
-    - OutlookSendTool
-    - OutlookReadTool
+    - GmailSendTool
+    - GmailReadTool
   llm: gpt-4o
   allow_delegation: false
 
@@ -24,7 +24,7 @@ doc_agent:
     clear, actionable insights. Never misses important details.
   tools:
     - DocReaderTool
-    - OutlookSendTool
+    - GmailSendTool
   llm: gpt-4o
   allow_delegation: false
 

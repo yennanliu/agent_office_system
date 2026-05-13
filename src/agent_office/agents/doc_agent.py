@@ -1,7 +1,7 @@
 from crewai import Agent
 
 from agent_office.tools.doc_reader_tool import DocReaderTool
-from agent_office.tools.outlook_tool import OutlookSendTool
+from agent_office.tools.gmail_tool import GmailSendTool
 
 
 def build_doc_agent() -> Agent:
@@ -15,7 +15,7 @@ def build_doc_agent() -> Agent:
             "You are a meticulous analyst who specializes in distilling long documents into "
             "clear, actionable insights. You never miss important details."
         ),
-        tools=[DocReaderTool(), OutlookSendTool()],
+        tools=[DocReaderTool(), GmailSendTool()],
         llm="gpt-4o",
         verbose=True,
         allow_delegation=False,
