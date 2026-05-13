@@ -1,0 +1,29 @@
+# Reference configuration for tasks.
+# Runtime task definitions are constructed inline inside each Crew class.
+
+send_email:
+  description: >
+    Draft a professional email body based on the provided intent, then send it
+    to the specified recipient(s) via Outlook.
+  expected_output: Confirmation that the email was sent successfully, including recipient and subject.
+  agent: email_agent
+
+summarize_document:
+  description: >
+    Read the document at the provided path or URL.
+    Produce a structured summary with:
+      1. Executive Summary (2-3 sentences)
+      2. Key Points (bulleted list)
+      3. Action Items (if any)
+  expected_output: Structured document summary with executive summary, key points, and action items.
+  agent: doc_agent
+
+email_summary:
+  description: >
+    Send the document summary produced in the previous task via email to
+    the specified recipients. Use an appropriate subject line referencing
+    the document name and format the body clearly.
+  expected_output: Confirmation that the summary email was sent to all recipients.
+  agent: email_agent
+  context:
+    - summarize_document

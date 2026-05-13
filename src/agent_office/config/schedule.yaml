@@ -1,0 +1,21 @@
+# Cron schedule configuration. Loaded at runtime by SchedulerCrew.
+# cron format: "minute hour day month day_of_week"
+# crew: EmailCrew | DocSummaryCrew
+
+jobs:
+  - id: weekly_report_summary
+    cron: "0 8 * * MON"          # Every Monday at 8 AM
+    crew: DocSummaryCrew
+    params:
+      doc_path: "/path/to/reports/weekly.pdf"
+      recipients:
+        - manager@company.com
+      notes: "This is the weekly performance report. Highlight any KPI misses."
+
+  - id: daily_inbox_digest
+    cron: "0 9 * * *"            # Every day at 9 AM
+    crew: EmailCrew
+    params:
+      to: "me@company.com"
+      subject: "Daily Inbox Digest"
+      task: "Summarize unread emails from the last 24 hours and list the top 5 items requiring action."
