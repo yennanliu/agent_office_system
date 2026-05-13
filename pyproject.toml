@@ -2,7 +2,7 @@
 name = "agent-office"
 version = "0.1.0"
 description = "Multi-agent office automation system using CrewAI"
-requires-python = ">=3.11"
+requires-python = ">=3.11,<3.14"
 dependencies = [
     "crewai>=0.80.0",
     "openai>=1.0.0",

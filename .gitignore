@@ -1,1 +1,4 @@
 .env
+src/agent_office/__pycache__/
+src/agent_office/crews/__pycache__/
+src/agent_office/*/__pycache__/
