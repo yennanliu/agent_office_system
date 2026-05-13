@@ -3,7 +3,7 @@
 Multi-agent office automation built on **CrewAI**, **OpenAI GPT-4o**, and **Gmail**. Managed with **uv** (Python). All runs are tracked in SQLite and visible in a Streamlit dashboard.
 
 
-<p align="center"><img src ="./doc/pic/demo_1.png" ></p>
+<p align="center"><img src ="./doc/pic/demo_3.png" ></p>
 <p align="center"><img src ="./doc/pic/demo_2.png" ></p>
 
 
