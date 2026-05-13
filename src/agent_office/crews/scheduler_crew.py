@@ -23,6 +23,12 @@ def _run_crew(crew_name: str, params: dict) -> None:
                 recipients=params.get("recipients", []),
                 additional_notes=params.get("notes", ""),
             )
+        elif crew_name == "StockSummaryCrew":
+            from agent_office.crews.stock_summary_crew import StockSummaryCrew
+            StockSummaryCrew().run(
+                tickers=params.get("tickers", []),
+                recipients=params.get("recipients", []),
+            )
         else:
             raise ValueError(f"Unknown crew: {crew_name!r}")
     except Exception:

@@ -2,6 +2,7 @@ from crewai import Crew, Process, Task
 
 from agent_office.agents.doc_agent import build_doc_agent
 from agent_office.agents.email_agent import build_email_agent
+from agent_office.db.tracker import track_crew_run
 
 
 class DocSummaryCrew:
@@ -34,10 +35,16 @@ class DocSummaryCrew:
             context=[summarize_task],
         )
 
-        result = Crew(
+        crew = Crew(
             agents=[doc_agent, email_agent],
             tasks=[summarize_task, email_task],
             process=Process.sequential,
             verbose=True,
-        ).kickoff()
+        )
+        result = track_crew_run(
+            name=f"Doc summary: {doc_path}",
+            job_type="DocSummaryCrew",
+            agents=["Document Analyst", "Gmail Email Assistant"],
+            crew=crew,
+        )
         return str(result)

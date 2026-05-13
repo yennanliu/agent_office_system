@@ -1,6 +1,7 @@
 from crewai import Crew, Process, Task
 
 from agent_office.agents.email_agent import build_email_agent
+from agent_office.db.tracker import track_crew_run
 
 
 class EmailCrew:
@@ -23,10 +24,16 @@ class EmailCrew:
             expected_output="Confirmation that the email was sent, including recipient, subject, and any attachments.",
             agent=agent,
         )
-        result = Crew(
+        crew = Crew(
             agents=[agent],
             tasks=[task],
             process=Process.sequential,
             verbose=True,
-        ).kickoff()
+        )
+        result = track_crew_run(
+            name=f"Email to {to} — {subject}",
+            job_type="EmailCrew",
+            agents=["Gmail Email Assistant"],
+            crew=crew,
+        )
         return str(result)
