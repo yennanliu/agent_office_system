@@ -41,10 +41,9 @@ class DocSummaryCrew:
             process=Process.sequential,
             verbose=True,
         )
-        result = track_crew_run(
+        return str(track_crew_run(
             name=f"Doc summary: {doc_path}",
-            job_type="DocSummaryCrew",
-            agents=["Document Analyst", "Gmail Email Assistant"],
+            job_type=type(self).__name__,
+            agents=[doc_agent.role, email_agent.role],
             crew=crew,
-        )
-        return str(result)
+        ))

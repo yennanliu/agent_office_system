@@ -7,6 +7,7 @@ from crewai.tools import BaseTool
 from pydantic import BaseModel, Field
 
 _SUPPORTED = {".pdf", ".docx", ".txt", ".md", ".csv"}
+_TEXT_TYPES = {".txt", ".md", ".csv"}
 
 
 class DocReaderInput(BaseModel):
@@ -30,7 +31,12 @@ class DocReaderTool(BaseTool):
     def _from_url(self, url: str) -> str:
         resp = httpx.get(url, follow_redirects=True, timeout=30)
         resp.raise_for_status()
-        suffix = Path(url.split("?")[0]).suffix or ".tmp"
+        suffix = Path(url.split("?")[0]).suffix.lower() or ".tmp"
+
+        # Plain-text formats don't need the disk round-trip
+        if suffix in _TEXT_TYPES:
+            return resp.text
+
         with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as f:
             f.write(resp.content)
             tmp = f.name

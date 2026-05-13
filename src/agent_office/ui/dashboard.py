@@ -1,27 +1,33 @@
 import sys
 from pathlib import Path
 
-# Ensure the package is importable when launched via `streamlit run`
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 import pandas as pd
 import streamlit as st
 
-from agent_office.db.database import get_all_runs, init_db
+from agent_office.db.database import RunStatus, get_all_runs, init_db
 
 st.set_page_config(page_title="Agent Office", page_icon="🤖", layout="wide")
 st.title("🤖 Agent Office — Run Dashboard")
 
 init_db()
 
+
+@st.cache_data(ttl=30)
+def _load_runs():
+    return get_all_runs()
+
+
 # ── Controls ──────────────────────────────────────────────────────────────────
 col_refresh, col_filter = st.columns([1, 3])
 with col_refresh:
     if st.button("🔄 Refresh"):
+        st.cache_data.clear()
         st.rerun()
 
 # ── Load data ─────────────────────────────────────────────────────────────────
-runs = get_all_runs()
+runs = _load_runs()
 
 if not runs:
     st.info("No runs recorded yet. Run a command to see results here.")
@@ -30,10 +36,11 @@ if not runs:
 df = pd.DataFrame(runs)
 
 # ── Summary metrics ───────────────────────────────────────────────────────────
+status_counts = df["status"].value_counts()
 total = len(df)
-success = (df["status"] == "success").sum()
-failed = (df["status"] == "failed").sum()
-running = (df["status"] == "running").sum()
+success = status_counts.get(RunStatus.SUCCESS, 0)
+failed = status_counts.get(RunStatus.FAILED, 0)
+running = status_counts.get(RunStatus.RUNNING, 0)
 total_tokens = int(df["total_tokens"].sum())
 total_cost = df["estimated_cost_usd"].sum()
 
@@ -52,10 +59,10 @@ with col_filter:
     job_types = ["All"] + sorted(df["job_type"].dropna().unique().tolist())
     selected_type = st.selectbox("Filter by job type", job_types)
 
-statuses = ["All", "success", "failed", "running"]
+statuses = ["All", RunStatus.SUCCESS, RunStatus.FAILED, RunStatus.RUNNING]
 selected_status = st.selectbox("Filter by status", statuses)
 
-filtered = df.copy()
+filtered = df
 if selected_type != "All":
     filtered = filtered[filtered["job_type"] == selected_type]
 if selected_status != "All":
