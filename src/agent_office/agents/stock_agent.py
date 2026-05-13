@@ -1,8 +1,10 @@
+from crewai import Agent
+
 from agent_office.agents.base import build_agent
 from agent_office.tools.stock_tool import StockDataTool
 
 
-def build_stock_agent():
+def build_stock_agent() -> Agent:
     return build_agent(
         role="US Stock Investment Analyst",
         goal=(

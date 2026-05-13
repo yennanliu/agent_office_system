@@ -1,9 +1,11 @@
+from crewai import Agent
+
 from agent_office.agents.base import build_agent
 from agent_office.tools.doc_reader_tool import DocReaderTool
 from agent_office.tools.gmail_tool import GmailSendTool
 
 
-def build_doc_agent():
+def build_doc_agent() -> Agent:
     return build_agent(
         role="Document Analyst",
         goal=(

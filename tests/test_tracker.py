@@ -4,7 +4,7 @@ from unittest.mock import MagicMock
 import pytest
 
 import agent_office.db.database as db_module
-from agent_office.db.database import RunStatus, get_all_runs, init_db
+from agent_office.db.database import RunStatus, get_all_runs, get_steps_for_run, init_db
 
 
 @pytest.fixture(autouse=True)
@@ -69,3 +69,53 @@ class TestTrackCrewRun:
         runs = get_all_runs()
         assert "agent-a" in runs[0]["agents"]
         assert "agent-b" in runs[0]["agents"]
+
+    def test_task_callback_records_steps(self):
+        from agent_office.db.tracker import track_crew_run
+
+        crew = _make_crew()
+
+        # Simulate crew.kickoff() firing the task_callback for each task
+        def fake_kickoff():
+            task_out = MagicMock()
+            task_out.agent = "Test Agent"
+            task_out.description = "Do something"
+            task_out.raw = "output text"
+            crew.task_callback(task_out)
+            return "done"
+
+        crew.kickoff.side_effect = fake_kickoff
+        track_crew_run("r", "T", ["a"], crew)
+
+        runs = get_all_runs()
+        steps = get_steps_for_run(runs[0]["id"])
+        assert len(steps) == 1
+        assert steps[0]["agent"] == "Test Agent"
+        assert steps[0]["task_description"] == "Do something"
+        assert steps[0]["output_preview"] == "output text"
+        assert steps[0]["step_index"] == 0
+        assert steps[0]["duration_s"] >= 0
+
+    def test_multiple_steps_recorded_in_order(self):
+        from agent_office.db.tracker import track_crew_run
+
+        crew = _make_crew()
+
+        def fake_kickoff():
+            for i, label in enumerate(["Step A", "Step B", "Step C"]):
+                task_out = MagicMock()
+                task_out.agent = f"agent-{i}"
+                task_out.description = label
+                task_out.raw = f"output {i}"
+                crew.task_callback(task_out)
+            return "done"
+
+        crew.kickoff.side_effect = fake_kickoff
+        track_crew_run("r", "T", ["a"], crew)
+
+        runs = get_all_runs()
+        steps = get_steps_for_run(runs[0]["id"])
+        assert len(steps) == 3
+        assert [s["step_index"] for s in steps] == [0, 1, 2]
+        assert steps[0]["task_description"] == "Step A"
+        assert steps[2]["task_description"] == "Step C"

@@ -5,8 +5,10 @@ import agent_office.db.database as db_module
 from agent_office.db.database import (
     RunStatus,
     get_all_runs,
+    get_steps_for_run,
     init_db,
     insert_run,
+    insert_step,
     update_run,
 )
 
@@ -126,3 +128,40 @@ class TestGetAllRuns:
         runs = get_all_runs()
         assert runs[0]["id"] == id2
         assert runs[1]["id"] == id1
+
+
+class TestInsertStep:
+    def test_inserts_step(self):
+        run_id = insert_run("r", "T", ["a"])
+        insert_step(run_id, 0, "agent-a", "Do thing", "output preview", 1.23)
+        steps = get_steps_for_run(run_id)
+        assert len(steps) == 1
+        s = steps[0]
+        assert s["run_id"] == run_id
+        assert s["step_index"] == 0
+        assert s["agent"] == "agent-a"
+        assert s["task_description"] == "Do thing"
+        assert s["output_preview"] == "output preview"
+        assert abs(s["duration_s"] - 1.23) < 0.01
+
+    def test_multiple_steps_ordered(self):
+        run_id = insert_run("r", "T", ["a"])
+        insert_step(run_id, 0, "a1", "task1", "out1", 0.5)
+        insert_step(run_id, 1, "a2", "task2", "out2", 1.5)
+        steps = get_steps_for_run(run_id)
+        assert len(steps) == 2
+        assert steps[0]["step_index"] == 0
+        assert steps[1]["step_index"] == 1
+
+    def test_empty_for_unknown_run(self):
+        assert get_steps_for_run(9999) == []
+
+    def test_steps_isolated_per_run(self):
+        id1 = insert_run("r1", "T", ["a"])
+        id2 = insert_run("r2", "T", ["a"])
+        insert_step(id1, 0, "a", "t1", "o1", 1.0)
+        insert_step(id2, 0, "b", "t2", "o2", 2.0)
+        assert len(get_steps_for_run(id1)) == 1
+        assert len(get_steps_for_run(id2)) == 1
+        assert get_steps_for_run(id1)[0]["agent"] == "a"
+        assert get_steps_for_run(id2)[0]["agent"] == "b"
