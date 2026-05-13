@@ -1,27 +1,38 @@
 import sys
 from pathlib import Path
 
-# Ensure the package is importable when launched via `streamlit run`
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 import pandas as pd
 import streamlit as st
 
-from agent_office.db.database import get_all_runs, init_db
+from agent_office.db.database import RunStatus, get_all_runs, get_steps_for_run, init_db
 
 st.set_page_config(page_title="Agent Office", page_icon="🤖", layout="wide")
 st.title("🤖 Agent Office — Run Dashboard")
 
 init_db()
 
+
+@st.cache_data(ttl=30)
+def _load_runs():
+    return get_all_runs()
+
+
+@st.cache_data(ttl=30)
+def _load_steps(run_id: int):
+    return get_steps_for_run(run_id)
+
+
 # ── Controls ──────────────────────────────────────────────────────────────────
 col_refresh, col_filter = st.columns([1, 3])
 with col_refresh:
     if st.button("🔄 Refresh"):
+        st.cache_data.clear()
         st.rerun()
 
 # ── Load data ─────────────────────────────────────────────────────────────────
-runs = get_all_runs()
+runs = _load_runs()
 
 if not runs:
     st.info("No runs recorded yet. Run a command to see results here.")
@@ -30,10 +41,11 @@ if not runs:
 df = pd.DataFrame(runs)
 
 # ── Summary metrics ───────────────────────────────────────────────────────────
+status_counts = df["status"].value_counts()
 total = len(df)
-success = (df["status"] == "success").sum()
-failed = (df["status"] == "failed").sum()
-running = (df["status"] == "running").sum()
+success = status_counts.get(RunStatus.SUCCESS, 0)
+failed = status_counts.get(RunStatus.FAILED, 0)
+running = status_counts.get(RunStatus.RUNNING, 0)
 total_tokens = int(df["total_tokens"].sum())
 total_cost = df["estimated_cost_usd"].sum()
 
@@ -52,10 +64,10 @@ with col_filter:
     job_types = ["All"] + sorted(df["job_type"].dropna().unique().tolist())
     selected_type = st.selectbox("Filter by job type", job_types)
 
-statuses = ["All", "success", "failed", "running"]
+statuses = ["All", RunStatus.SUCCESS, RunStatus.FAILED, RunStatus.RUNNING]
 selected_status = st.selectbox("Filter by status", statuses)
 
-filtered = df.copy()
+filtered = df
 if selected_type != "All":
     filtered = filtered[filtered["job_type"] == selected_type]
 if selected_status != "All":
@@ -102,3 +114,53 @@ if not chart_df.empty:
         type_counts = df["job_type"].value_counts().reset_index()
         type_counts.columns = ["job_type", "count"]
         st.bar_chart(type_counts.set_index("job_type")["count"])
+
+# ── Step breakdown ────────────────────────────────────────────────────────────
+st.divider()
+st.subheader("Step Breakdown")
+
+run_options = {f"Run #{r['id']} — {r['name']} ({r['status']})": r["id"] for r in runs}
+selected_label = st.selectbox("Select a run to inspect", list(run_options.keys()))
+selected_run_id = run_options[selected_label]
+
+steps = _load_steps(selected_run_id)
+
+if not steps:
+    st.info("No step data for this run. Steps are recorded from new runs going forward.")
+else:
+    steps_df = pd.DataFrame(steps)
+
+    # ── Step-level summary metrics ────────────────────────────────────────────
+    total_duration = steps_df["duration_s"].sum()
+    num_steps = len(steps_df)
+    avg_duration = total_duration / num_steps if num_steps else 0
+
+    s1, s2, s3 = st.columns(3)
+    s1.metric("Steps", num_steps)
+    s2.metric("Total Time (s)", f"{total_duration:.1f}s")
+    s3.metric("Avg Time / Step (s)", f"{avg_duration:.1f}s")
+
+    # ── Step table ────────────────────────────────────────────────────────────
+    step_display_cols = ["step_index", "agent", "duration_s", "task_description", "output_preview"]
+    step_display_cols = [c for c in step_display_cols if c in steps_df.columns]
+
+    st.dataframe(
+        steps_df[step_display_cols],
+        use_container_width=True,
+        hide_index=True,
+        column_config={
+            "step_index": st.column_config.NumberColumn("#", width="small"),
+            "agent": st.column_config.TextColumn("Agent", width="medium"),
+            "duration_s": st.column_config.NumberColumn("Time (s)", format="%.2f", width="small"),
+            "task_description": st.column_config.TextColumn("Task", width="large"),
+            "output_preview": st.column_config.TextColumn("Output Preview", width="large"),
+        },
+    )
+
+    # ── Step timing chart ─────────────────────────────────────────────────────
+    if num_steps > 1:
+        st.subheader("Time per Step")
+        timing_df = steps_df.set_index(
+            steps_df["step_index"].astype(str) + " · " + steps_df["agent"].fillna("")
+        )["duration_s"]
+        st.bar_chart(timing_df)

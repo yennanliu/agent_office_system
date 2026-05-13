@@ -1,10 +1,11 @@
 from crewai import Agent
 
+from agent_office.agents.base import build_agent
 from agent_office.tools.stock_tool import StockDataTool
 
 
 def build_stock_agent() -> Agent:
-    return Agent(
+    return build_agent(
         role="US Stock Investment Analyst",
         goal=(
             "Analyze US stocks using real financial data and provide clear, actionable "
@@ -18,7 +19,4 @@ def build_stock_agent() -> Agent:
             "numbers and compare metrics to sector norms."
         ),
         tools=[StockDataTool()],
-        llm="gpt-4o",
-        verbose=True,
-        allow_delegation=False,
     )

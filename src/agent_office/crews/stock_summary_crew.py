@@ -52,10 +52,9 @@ class StockSummaryCrew:
             process=Process.sequential,
             verbose=True,
         )
-        result = track_crew_run(
+        return str(track_crew_run(
             name=f"Stock summary: {ticker_str}",
-            job_type="StockSummaryCrew",
-            agents=["US Stock Investment Analyst", "Gmail Email Assistant"],
+            job_type=type(self).__name__,
+            agents=[stock_agent.role, email_agent.role],
             crew=crew,
-        )
-        return str(result)
+        ))

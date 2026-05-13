@@ -8,19 +8,17 @@ class EmailCrew:
     def run(self, to: str, subject: str, intent: str, attachments: list[str] | None = None) -> str:
         agent = build_email_agent()
 
-        attachment_instruction = ""
+        desc_lines = [
+            f"Send an email to: {to}",
+            f"Subject: {subject}",
+            f"Intent / content guidance: {intent}",
+        ]
         if attachments:
-            paths = ", ".join(attachments)
-            attachment_instruction = f"\nAttach the following local file(s): {paths}"
+            desc_lines.append(f"Attach the following local file(s): {', '.join(attachments)}")
+        desc_lines.append("Draft a professional email body matching the intent, then send it via Gmail.")
 
         task = Task(
-            description=(
-                f"Send an email to: {to}\n"
-                f"Subject: {subject}\n"
-                f"Intent / content guidance: {intent}\n"
-                f"{attachment_instruction}\n"
-                "Draft a professional email body matching the intent, then send it via Gmail."
-            ),
+            description="\n".join(desc_lines),
             expected_output="Confirmation that the email was sent, including recipient, subject, and any attachments.",
             agent=agent,
         )
@@ -30,10 +28,9 @@ class EmailCrew:
             process=Process.sequential,
             verbose=True,
         )
-        result = track_crew_run(
+        return str(track_crew_run(
             name=f"Email to {to} — {subject}",
-            job_type="EmailCrew",
-            agents=["Gmail Email Assistant"],
+            job_type=type(self).__name__,
+            agents=[agent.role],
             crew=crew,
-        )
-        return str(result)
+        ))

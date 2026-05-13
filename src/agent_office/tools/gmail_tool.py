@@ -13,6 +13,8 @@ from typing import Optional
 from crewai.tools import BaseTool
 from pydantic import BaseModel, Field
 
+from agent_office.utils import parse_emails
+
 _SMTP_HOST = "smtp.gmail.com"
 _SMTP_PORT = 587
 _IMAP_HOST = "imap.gmail.com"
@@ -54,7 +56,6 @@ class GmailSendTool(BaseTool):
     ) -> str:
         gmail_address, app_password = _credentials()
 
-        # Use "mixed" when there are attachments, "alternative" for body-only
         msg = MIMEMultipart("mixed" if attachments else "alternative")
         msg["From"] = gmail_address
         msg["To"] = to
@@ -78,9 +79,7 @@ class GmailSendTool(BaseTool):
                 msg.attach(part)
                 attached_names.append(path.name)
 
-        recipients = [r.strip() for r in to.split(",")]
-        if cc:
-            recipients += [r.strip() for r in cc.split(",")]
+        recipients = parse_emails(to) + (parse_emails(cc) if cc else [])
 
         with smtplib.SMTP(_SMTP_HOST, _SMTP_PORT) as server:
             server.ehlo()
@@ -121,36 +120,27 @@ class GmailReadTool(BaseTool):
             if not ids:
                 return "No emails found."
 
-            selected_ids = ids[-max_results:]
             lines = []
-            for uid in reversed(selected_ids):
-                _, raw = mail.fetch(uid, "(RFC822)")
-                msg = message_from_bytes(raw[0][1])
+            for uid in reversed(ids[-max_results:]):
+                # Fetch only the needed headers — avoids downloading bodies and attachments
+                _, hdr_data = mail.fetch(uid, "(BODY.PEEK[HEADER.FIELDS (FROM SUBJECT DATE)])")
+                hdr_msg = message_from_bytes(hdr_data[0][1])
 
-                subject_parts = decode_header(msg["Subject"] or "")
+                subject_parts = decode_header(hdr_msg["Subject"] or "")
                 subject = "".join(
                     part.decode(enc or "utf-8") if isinstance(part, bytes) else part
                     for part, enc in subject_parts
                 )
 
-                body_preview = ""
-                if msg.is_multipart():
-                    for part in msg.walk():
-                        if part.get_content_type() == "text/plain":
-                            body_preview = (part.get_payload(decode=True) or b"").decode(
-                                "utf-8", errors="replace"
-                            )[:200]
-                            break
-                else:
-                    body_preview = (msg.get_payload(decode=True) or b"").decode(
-                        "utf-8", errors="replace"
-                    )[:200]
+                # Fetch first 500 bytes of the text body for a lightweight preview
+                _, text_data = mail.fetch(uid, "(BODY.PEEK[TEXT]<0.500>)")
+                body_preview = (text_data[0][1] or b"").decode("utf-8", errors="replace")[:200].strip()
 
                 lines.append(
-                    f"From: {msg['From']}\n"
+                    f"From: {hdr_msg['From']}\n"
                     f"Subject: {subject}\n"
-                    f"Date: {msg['Date']}\n"
-                    f"Preview: {body_preview.strip()}\n"
+                    f"Date: {hdr_msg['Date']}\n"
+                    f"Preview: {body_preview}\n"
                     "---"
                 )
 

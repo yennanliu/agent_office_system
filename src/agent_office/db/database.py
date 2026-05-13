@@ -1,10 +1,10 @@
 import sqlite3
 from contextlib import contextmanager
 from datetime import datetime, timezone
+from enum import StrEnum
 from pathlib import Path
 from typing import Any
 
-# Stored at project root (next to pyproject.toml)
 DB_PATH = Path(__file__).parent.parent.parent.parent / "runs.db"
 
 _CREATE_TABLE = """
@@ -24,6 +24,24 @@ CREATE TABLE IF NOT EXISTS runs (
 )
 """
 
+_CREATE_STEPS_TABLE = """
+CREATE TABLE IF NOT EXISTS run_steps (
+    id               INTEGER PRIMARY KEY AUTOINCREMENT,
+    run_id           INTEGER NOT NULL REFERENCES runs(id),
+    step_index       INTEGER NOT NULL,
+    agent            TEXT,
+    task_description TEXT,
+    output_preview   TEXT,
+    duration_s       REAL DEFAULT 0.0
+)
+"""
+
+
+class RunStatus(StrEnum):
+    RUNNING = "running"
+    SUCCESS = "success"
+    FAILED = "failed"
+
 
 @contextmanager
 def _conn():
@@ -32,6 +50,9 @@ def _conn():
     try:
         yield con
         con.commit()
+    except Exception:
+        con.rollback()
+        raise
     finally:
         con.close()
 
@@ -40,13 +61,14 @@ def init_db() -> None:
     DB_PATH.parent.mkdir(parents=True, exist_ok=True)
     with _conn() as con:
         con.execute(_CREATE_TABLE)
+        con.execute(_CREATE_STEPS_TABLE)
 
 
 def insert_run(name: str, job_type: str, agents: list[str]) -> int:
     with _conn() as con:
         cur = con.execute(
             "INSERT INTO runs (name, job_type, agents, started_at, status) VALUES (?,?,?,?,?)",
-            (name, job_type, ", ".join(agents), _now(), "running"),
+            (name, job_type, ", ".join(agents), _now(), RunStatus.RUNNING),
         )
         return cur.lastrowid
 
@@ -54,7 +76,7 @@ def insert_run(name: str, job_type: str, agents: list[str]) -> int:
 def update_run(
     run_id: int,
     *,
-    status: str,
+    status: RunStatus,
     total_tokens: int = 0,
     prompt_tokens: int = 0,
     completion_tokens: int = 0,
@@ -76,6 +98,32 @@ def update_run(
 def get_all_runs() -> list[dict[str, Any]]:
     with _conn() as con:
         rows = con.execute("SELECT * FROM runs ORDER BY id DESC").fetchall()
+    return [dict(r) for r in rows]
+
+
+def insert_step(
+    run_id: int,
+    step_index: int,
+    agent: str,
+    task_description: str,
+    output_preview: str,
+    duration_s: float,
+) -> None:
+    with _conn() as con:
+        con.execute(
+            """INSERT INTO run_steps
+               (run_id, step_index, agent, task_description, output_preview, duration_s)
+               VALUES (?, ?, ?, ?, ?, ?)""",
+            (run_id, step_index, agent, task_description, output_preview, round(duration_s, 2)),
+        )
+
+
+def get_steps_for_run(run_id: int) -> list[dict[str, Any]]:
+    with _conn() as con:
+        rows = con.execute(
+            "SELECT * FROM run_steps WHERE run_id=? ORDER BY step_index",
+            (run_id,),
+        ).fetchall()
     return [dict(r) for r in rows]
 
 

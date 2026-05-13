@@ -3,6 +3,28 @@ from crewai.tools import BaseTool
 from pydantic import BaseModel, Field
 
 
+def _pct(val) -> str:
+    return f"{val * 100:.1f}%" if val is not None else "N/A"
+
+
+def _usd(val) -> str:
+    return f"${val:,.2f}" if val is not None else "N/A"
+
+
+def _fmt(val) -> str:
+    return str(round(val, 2)) if val is not None else "N/A"
+
+
+def _market_cap(val) -> str:
+    if not val:
+        return "N/A"
+    if val >= 1e12:
+        return f"${val / 1e12:.2f}T"
+    if val >= 1e9:
+        return f"${val / 1e9:.2f}B"
+    return f"${val / 1e6:.0f}M"
+
+
 class StockDataInput(BaseModel):
     ticker: str = Field(description="Stock ticker symbol, e.g. AAPL, MSFT, NVDA")
 
@@ -23,15 +45,6 @@ class StockDataTool(BaseTool):
         if not info or info.get("regularMarketPrice") is None and info.get("currentPrice") is None:
             return f"Could not fetch data for ticker '{symbol}'. Check the symbol and try again."
 
-        def _pct(val) -> str:
-            return f"{val * 100:.1f}%" if val is not None else "N/A"
-
-        def _usd(val) -> str:
-            return f"${val:,.2f}" if val is not None else "N/A"
-
-        def _fmt(val) -> str:
-            return str(round(val, 2)) if val is not None else "N/A"
-
         price = info.get("currentPrice") or info.get("regularMarketPrice")
         hist = stock.history(period="3mo")
         price_change_3m = "N/A"
@@ -39,17 +52,6 @@ class StockDataTool(BaseTool):
             start = hist["Close"].iloc[0]
             end = hist["Close"].iloc[-1]
             price_change_3m = f"{(end - start) / start * 100:.1f}%"
-
-        market_cap = info.get("marketCap")
-        if market_cap:
-            if market_cap >= 1e12:
-                market_cap_str = f"${market_cap / 1e12:.2f}T"
-            elif market_cap >= 1e9:
-                market_cap_str = f"${market_cap / 1e9:.2f}B"
-            else:
-                market_cap_str = f"${market_cap / 1e6:.0f}M"
-        else:
-            market_cap_str = "N/A"
 
         lines = [
             f"=== {symbol} — {info.get('longName', symbol)} ===",
@@ -64,7 +66,7 @@ class StockDataTool(BaseTool):
             f"200-Day MA:         {_usd(info.get('twoHundredDayAverage'))}",
             "",
             "── Valuation ──",
-            f"Market Cap:         {market_cap_str}",
+            f"Market Cap:         {_market_cap(info.get('marketCap'))}",
             f"Trailing P/E:       {_fmt(info.get('trailingPE'))}",
             f"Forward P/E:        {_fmt(info.get('forwardPE'))}",
             f"PEG Ratio:          {_fmt(info.get('pegRatio'))}",

@@ -29,10 +29,10 @@ def cmd_email(args: argparse.Namespace) -> None:
 
 def cmd_summarize(args: argparse.Namespace) -> None:
     from agent_office.crews.doc_summary_crew import DocSummaryCrew
-    recipients = [r.strip() for r in args.to.split(",")]
+    from agent_office.utils import parse_emails
     result = DocSummaryCrew().run(
         doc_path=args.doc,
-        recipients=recipients,
+        recipients=parse_emails(args.to),
         additional_notes=args.notes or "",
     )
     print(result)
@@ -40,9 +40,9 @@ def cmd_summarize(args: argparse.Namespace) -> None:
 
 def cmd_stock(args: argparse.Namespace) -> None:
     from agent_office.crews.stock_summary_crew import StockSummaryCrew
+    from agent_office.utils import parse_emails
     tickers = [t.strip().upper() for t in args.ticker]
-    recipients = [r.strip() for r in args.to.split(",")]
-    result = StockSummaryCrew().run(tickers=tickers, recipients=recipients)
+    result = StockSummaryCrew().run(tickers=tickers, recipients=parse_emails(args.to))
     print(result)
 
 
@@ -72,6 +72,9 @@ def cmd_ui(args: argparse.Namespace) -> None:
 
 
 def main() -> None:
+    from agent_office.db.database import init_db
+    init_db()
+
     parser = argparse.ArgumentParser(
         prog="agent-office",
         description="Multi-agent office automation system (CrewAI + OpenAI + Gmail)",
