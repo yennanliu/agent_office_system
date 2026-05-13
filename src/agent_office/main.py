@@ -17,7 +17,12 @@ logger = logging.getLogger(__name__)
 
 def cmd_email(args: argparse.Namespace) -> None:
     from agent_office.crews.email_crew import EmailCrew
-    result = EmailCrew().run(to=args.to, subject=args.subject, intent=args.intent)
+    result = EmailCrew().run(
+        to=args.to,
+        subject=args.subject,
+        intent=args.intent,
+        attachments=args.attach or None,
+    )
     print(result)
 
 
@@ -62,6 +67,7 @@ def main() -> None:
     ep.add_argument("--to", required=True, help="Recipient email(s), comma-separated")
     ep.add_argument("--subject", required=True, help="Email subject")
     ep.add_argument("--intent", required=True, help="Natural language description of what to write")
+    ep.add_argument("--attach", metavar="FILE", action="append", help="Local file path to attach (repeat for multiple files)")
     ep.set_defaults(func=cmd_email)
 
     # --- summarize ---

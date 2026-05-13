@@ -1,10 +1,13 @@
 import imaplib
+import mimetypes
 import os
 import smtplib
-from email import message_from_bytes
+from email import encoders, message_from_bytes
 from email.header import decode_header
+from email.mime.base import MIMEBase
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
+from pathlib import Path
 from typing import Optional
 
 from crewai.tools import BaseTool
@@ -27,26 +30,53 @@ class SendEmailInput(BaseModel):
     subject: str = Field(description="Email subject line")
     body: str = Field(description="HTML or plain-text email body")
     cc: Optional[str] = Field(default=None, description="CC recipients, comma-separated")
+    attachments: Optional[str] = Field(
+        default=None,
+        description="Local file path(s) to attach, comma-separated. Leave empty to send without attachments.",
+    )
 
 
 class GmailSendTool(BaseTool):
     name: str = "gmail_send_email"
     description: str = (
         "Send an email via Gmail SMTP. "
-        "Provide recipient(s), subject, and body."
+        "Provide recipient(s), subject, body, and optionally local file paths to attach."
     )
     args_schema: type[BaseModel] = SendEmailInput
 
-    def _run(self, to: str, subject: str, body: str, cc: Optional[str] = None) -> str:
+    def _run(
+        self,
+        to: str,
+        subject: str,
+        body: str,
+        cc: Optional[str] = None,
+        attachments: Optional[str] = None,
+    ) -> str:
         gmail_address, app_password = _credentials()
 
-        msg = MIMEMultipart("alternative")
+        # Use "mixed" when there are attachments, "alternative" for body-only
+        msg = MIMEMultipart("mixed" if attachments else "alternative")
         msg["From"] = gmail_address
         msg["To"] = to
         msg["Subject"] = subject
         if cc:
             msg["Cc"] = cc
         msg.attach(MIMEText(body, "html"))
+
+        attached_names = []
+        if attachments:
+            for raw_path in attachments.split(","):
+                path = Path(raw_path.strip())
+                if not path.exists():
+                    return f"Error: attachment not found — {path}"
+                mime_type, _ = mimetypes.guess_type(str(path))
+                main_type, sub_type = (mime_type or "application/octet-stream").split("/", 1)
+                part = MIMEBase(main_type, sub_type)
+                part.set_payload(path.read_bytes())
+                encoders.encode_base64(part)
+                part.add_header("Content-Disposition", "attachment", filename=path.name)
+                msg.attach(part)
+                attached_names.append(path.name)
 
         recipients = [r.strip() for r in to.split(",")]
         if cc:
@@ -58,7 +88,8 @@ class GmailSendTool(BaseTool):
             server.login(gmail_address, app_password)
             server.sendmail(gmail_address, recipients, msg.as_string())
 
-        return f"Email sent successfully to {to} (subject: {subject!r})"
+        suffix = f" with attachment(s): {', '.join(attached_names)}" if attached_names else ""
+        return f"Email sent successfully to {to} (subject: {subject!r}){suffix}"
 
 
 # ── Read Inbox ────────────────────────────────────────────────────────────────

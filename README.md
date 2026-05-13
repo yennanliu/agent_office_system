@@ -107,6 +107,25 @@ uv run agent-office summarize \
   --notes "Focus on the financial section"
 ```
 
+**Attatch files with Email**
+```bash
+# Single attachment
+uv run agent-office email \
+  --to "xxx@hotmail.com" \
+  --subject "Q2 Report" \
+  --intent "Q2 report is ready for review" \
+  --attach "/Users/jliu/reports/q2.pdf"
+
+
+# Multiple attachments
+uv run agent-office email \
+  --to "xxx@hotmail.com" \
+  --subject "Q2 Report" \
+  --intent "Q2 report is ready for review" \
+  --attach "/Users/jliu/reports/q2.pdf" \
+  --attach "/Users/jliu/reports/appendix.xlsx"
+```
+
 **Start the cron scheduler** (runs until Ctrl+C)
 ```bash
 uv run agent-office scheduler
