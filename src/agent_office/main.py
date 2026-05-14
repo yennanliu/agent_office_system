@@ -46,6 +46,18 @@ def cmd_stock(args: argparse.Namespace) -> None:
     print(result)
 
 
+def cmd_inbox_summary(args: argparse.Namespace) -> None:
+    from agent_office.crews.inbox_summary_crew import InboxSummaryCrew
+    from agent_office.utils import parse_emails
+    recipients = parse_emails(args.to) if args.to else None
+    result = InboxSummaryCrew().run(
+        recipients=recipients,
+        output_dir=args.output_dir or "",
+        max_emails=args.max_emails,
+    )
+    print(result)
+
+
 def cmd_scheduler(args: argparse.Namespace) -> None:
     from agent_office.crews.scheduler_crew import SchedulerCrew
     scheduler = SchedulerCrew(schedule_config_path=args.config)
@@ -102,6 +114,13 @@ def main() -> None:
                      help="Stock ticker symbol (repeat for multiple, e.g. --ticker AAPL --ticker MSFT)")
     stp.add_argument("--to", required=True, help="Recipient email(s), comma-separated")
     stp.set_defaults(func=cmd_stock)
+
+    # --- inbox-summary ---
+    isp = sub.add_parser("inbox-summary", help="Read, summarize, and optionally email recent Gmail inbox messages")
+    isp.add_argument("--to", default=None, help="Optional recipient email(s), comma-separated, to send the summary")
+    isp.add_argument("--max-emails", type=int, default=10, metavar="N", help="Number of recent emails to read (default: 10)")
+    isp.add_argument("--output-dir", default="", metavar="DIR", help="Directory to save the .txt report (default: current directory)")
+    isp.set_defaults(func=cmd_inbox_summary)
 
     # --- scheduler ---
     sched = sub.add_parser("scheduler", help="Start the background cron scheduler")

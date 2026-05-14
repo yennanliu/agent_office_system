@@ -34,6 +34,13 @@ def _run_crew(crew_name: str, params: dict) -> None:
                 tickers=params.get("tickers", []),
                 recipients=params.get("recipients", []),
             )
+        elif crew_name == "InboxSummaryCrew":
+            from agent_office.crews.inbox_summary_crew import InboxSummaryCrew
+            InboxSummaryCrew().run(
+                recipients=params.get("recipients") or None,
+                output_dir=params.get("output_dir", ""),
+                max_emails=params.get("max_emails", 10),
+            )
         else:
             raise ValueError(f"Unknown crew: {crew_name!r}")
     except Exception:

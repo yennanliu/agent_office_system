@@ -19,3 +19,12 @@ jobs:
       to: "me@company.com"
       subject: "Daily Inbox Digest"
       task: "Summarize unread emails from the last 24 hours and list the top 5 items requiring action."
+
+  - id: daily_inbox_summary
+    cron: "0 8 * * MON-FRI"      # Weekdays at 8 AM
+    crew: InboxSummaryCrew
+    params:
+      max_emails: 10
+      output_dir: "/path/to/reports"
+      recipients:
+        - me@company.com          # omit to save locally only
