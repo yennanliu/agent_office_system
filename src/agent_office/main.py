@@ -119,7 +119,7 @@ def main() -> None:
     isp = sub.add_parser("inbox-summary", help="Read, summarize, and optionally email recent Gmail inbox messages")
     isp.add_argument("--to", default=None, help="Optional recipient email(s), comma-separated, to send the summary")
     isp.add_argument("--max-emails", type=int, default=10, metavar="N", help="Number of recent emails to read (default: 10)")
-    isp.add_argument("--output-dir", default="", metavar="DIR", help="Directory to save the .txt report (default: current directory)")
+    isp.add_argument("--output-dir", default="output", metavar="DIR", help="Directory to save the .txt report (default: output/)")
     isp.set_defaults(func=cmd_inbox_summary)
 
     # --- scheduler ---

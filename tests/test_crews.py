@@ -1,5 +1,5 @@
 """Tests for crew orchestration (crewai.Task + track_crew_run mocked — no LLM calls)."""
-from unittest.mock import patch
+from unittest.mock import call, patch
 
 import pytest
 
@@ -152,3 +152,96 @@ class TestStockSummaryCrew:
         StockSummaryCrew().run(tickers=["NVDA"], recipients=["a@x.com"])
         first_task_kwargs = mock_task.call_args_list[0][1]
         assert "NVDA" in first_task_kwargs["description"]
+
+
+# ── InboxSummaryCrew ──────────────────────────────────────────────────────────
+
+class TestInboxSummaryCrew:
+    @patch("agent_office.crews.inbox_summary_crew.Task")
+    @patch("agent_office.crews.inbox_summary_crew.track_crew_run", return_value="inbox done")
+    @patch("agent_office.crews.inbox_summary_crew.build_inbox_summary_agent")
+    @patch("agent_office.crews.inbox_summary_crew.Crew")
+    def test_run_returns_str(self, mock_crew_cls, mock_agent, mock_tracker, mock_task):
+        from agent_office.crews.inbox_summary_crew import InboxSummaryCrew
+        result = InboxSummaryCrew().run()
+        assert result == "inbox done"
+
+    @patch("agent_office.crews.inbox_summary_crew.Task")
+    @patch("agent_office.crews.inbox_summary_crew.track_crew_run", return_value="ok")
+    @patch("agent_office.crews.inbox_summary_crew.build_inbox_summary_agent")
+    @patch("agent_office.crews.inbox_summary_crew.Crew")
+    def test_job_type_is_classname(self, mock_crew_cls, mock_agent, mock_tracker, mock_task):
+        from agent_office.crews.inbox_summary_crew import InboxSummaryCrew
+        InboxSummaryCrew().run()
+        _, kwargs = mock_tracker.call_args
+        assert kwargs.get("job_type") == "InboxSummaryCrew"
+
+    @patch("agent_office.crews.inbox_summary_crew.Task")
+    @patch("agent_office.crews.inbox_summary_crew.track_crew_run", return_value="ok")
+    @patch("agent_office.crews.inbox_summary_crew.build_inbox_summary_agent")
+    @patch("agent_office.crews.inbox_summary_crew.Crew")
+    def test_two_tasks_created_without_recipients(self, mock_crew_cls, mock_agent, mock_tracker, mock_task):
+        from agent_office.crews.inbox_summary_crew import InboxSummaryCrew
+        InboxSummaryCrew().run(recipients=None)
+        assert mock_task.call_count == 2
+
+    @patch("agent_office.crews.inbox_summary_crew.Task")
+    @patch("agent_office.crews.inbox_summary_crew.track_crew_run", return_value="ok")
+    @patch("agent_office.crews.inbox_summary_crew.build_email_agent")
+    @patch("agent_office.crews.inbox_summary_crew.build_inbox_summary_agent")
+    @patch("agent_office.crews.inbox_summary_crew.Crew")
+    def test_three_tasks_created_with_recipients(self, mock_crew_cls, mock_summary, mock_email, mock_tracker, mock_task):
+        from agent_office.crews.inbox_summary_crew import InboxSummaryCrew
+        InboxSummaryCrew().run(recipients=["a@x.com"])
+        assert mock_task.call_count == 3
+
+    @patch("agent_office.crews.inbox_summary_crew.Task")
+    @patch("agent_office.crews.inbox_summary_crew.track_crew_run", return_value="ok")
+    @patch("agent_office.crews.inbox_summary_crew.build_email_agent")
+    @patch("agent_office.crews.inbox_summary_crew.build_inbox_summary_agent")
+    @patch("agent_office.crews.inbox_summary_crew.Crew")
+    def test_email_agent_not_built_without_recipients(self, mock_crew_cls, mock_summary, mock_email, mock_tracker, mock_task):
+        from agent_office.crews.inbox_summary_crew import InboxSummaryCrew
+        InboxSummaryCrew().run(recipients=None)
+        mock_email.assert_not_called()
+
+    @patch("agent_office.crews.inbox_summary_crew.Task")
+    @patch("agent_office.crews.inbox_summary_crew.track_crew_run", return_value="ok")
+    @patch("agent_office.crews.inbox_summary_crew.build_inbox_summary_agent")
+    @patch("agent_office.crews.inbox_summary_crew.Crew")
+    def test_max_emails_in_read_task_description(self, mock_crew_cls, mock_agent, mock_tracker, mock_task):
+        from agent_office.crews.inbox_summary_crew import InboxSummaryCrew
+        InboxSummaryCrew().run(max_emails=20)
+        first_task_kwargs = mock_task.call_args_list[0][1]
+        assert "20" in first_task_kwargs["description"]
+
+    @patch("agent_office.crews.inbox_summary_crew.Task")
+    @patch("agent_office.crews.inbox_summary_crew.track_crew_run", return_value="ok")
+    @patch("agent_office.crews.inbox_summary_crew.build_inbox_summary_agent")
+    @patch("agent_office.crews.inbox_summary_crew.Crew")
+    def test_output_dir_in_save_task_description(self, mock_crew_cls, mock_agent, mock_tracker, mock_task):
+        from agent_office.crews.inbox_summary_crew import InboxSummaryCrew
+        InboxSummaryCrew().run(output_dir="/custom/reports")
+        save_task_kwargs = mock_task.call_args_list[1][1]
+        assert "/custom/reports" in save_task_kwargs["description"]
+
+    @patch("agent_office.crews.inbox_summary_crew.Task")
+    @patch("agent_office.crews.inbox_summary_crew.track_crew_run", return_value="ok")
+    @patch("agent_office.crews.inbox_summary_crew.build_email_agent")
+    @patch("agent_office.crews.inbox_summary_crew.build_inbox_summary_agent")
+    @patch("agent_office.crews.inbox_summary_crew.Crew")
+    def test_recipient_in_send_task_description(self, mock_crew_cls, mock_summary, mock_email, mock_tracker, mock_task):
+        from agent_office.crews.inbox_summary_crew import InboxSummaryCrew
+        InboxSummaryCrew().run(recipients=["boss@x.com"])
+        send_task_kwargs = mock_task.call_args_list[2][1]
+        assert "boss@x.com" in send_task_kwargs["description"]
+
+    @patch("agent_office.crews.inbox_summary_crew.Task")
+    @patch("agent_office.crews.inbox_summary_crew.track_crew_run", return_value="ok")
+    @patch("agent_office.crews.inbox_summary_crew.build_inbox_summary_agent")
+    @patch("agent_office.crews.inbox_summary_crew.Crew")
+    def test_default_output_dir_is_output(self, mock_crew_cls, mock_agent, mock_tracker, mock_task):
+        from agent_office.crews.inbox_summary_crew import InboxSummaryCrew
+        InboxSummaryCrew().run()
+        save_task_kwargs = mock_task.call_args_list[1][1]
+        assert "output" in save_task_kwargs["description"]

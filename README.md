@@ -12,37 +12,40 @@ Multi-agent office automation built on **CrewAI**, **OpenAI GPT-4o**, and **Gmai
 ## Architecture
 
 ```
-┌──────────────────────────────────────────────────────────────────┐
-│                        main.py (CLI)                             │
-│   email │ summarize │ stock │ scheduler │ ui  subcommands        │
-└───┬─────────┬──────────┬──────────┬──────────┬───────────────────┘
-    │         │          │          │          │
-    ▼         ▼          ▼          ▼          ▼
-EmailCrew  DocSummary  StockSummary  Scheduler  Streamlit
-           Crew        Crew          Crew       Dashboard
-    │         │          │          │
-    └────┬────┘          │     APScheduler
-         │               │     + schedule.yaml
-         ▼               ▼
-   CrewAI Agents
-┌──────────────────────────────────────────────────┐
-│ Gmail Email Assistant  │ GmailSendTool            │
-│                        │ GmailReadTool            │
-├──────────────────────────────────────────────────┤
-│ Document Analyst       │ DocReaderTool            │
-│                        │ GmailSendTool            │
-├──────────────────────────────────────────────────┤
-│ US Stock Analyst       │ StockDataTool (yfinance) │
-│                        │ GmailSendTool            │
-└──────────────────────────────────────────────────┘
-         │
-         ▼
-   LLM: OpenAI GPT-4o
-         │
-         ▼
-┌──────────────────────────────────────────────────┐
-│ SQLite  runs.db  (token cost, status, timing)    │
-└──────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                              main.py (CLI)                                  │
+│  email │ summarize │ stock │ inbox-summary │ scheduler │ ui  subcommands    │
+└───┬──────────┬──────────┬──────────┬───────────┬────────────┬───────────────┘
+    │          │          │          │           │            │
+    ▼          ▼          ▼          ▼           ▼            ▼
+EmailCrew  DocSummary  StockSummary  Inbox    Scheduler   Streamlit
+           Crew        Crew          Summary  Crew        Dashboard
+    │          │          │          Crew     │
+    └──────┬───┘          │            │  APScheduler
+           │              │            │  + schedule.yaml
+           ▼              ▼            ▼
+     CrewAI Agents
+┌──────────────────────────────────────────────────────┐
+│ Gmail Email Assistant  │ GmailSendTool               │
+│                        │ GmailReadTool               │
+├──────────────────────────────────────────────────────┤
+│ Document Analyst       │ DocReaderTool               │
+│                        │ GmailSendTool               │
+├──────────────────────────────────────────────────────┤
+│ US Stock Analyst       │ StockDataTool (yfinance)    │
+│                        │ GmailSendTool               │
+├──────────────────────────────────────────────────────┤
+│ Inbox Summarizer       │ GmailReadTool               │
+│                        │ ReportSaverTool             │
+└──────────────────────────────────────────────────────┘
+           │
+           ▼
+     LLM: OpenAI GPT-4o
+           │
+           ▼
+┌──────────────────────────────────────────────────────┐
+│ SQLite  runs.db  (token cost, status, timing)        │
+└──────────────────────────────────────────────────────┘
 ```
 
 **EmailCrew** — agent drafts body from natural language intent, sends via Gmail SMTP.
@@ -50,6 +53,8 @@ EmailCrew  DocSummary  StockSummary  Scheduler  Streamlit
 **DocSummaryCrew** — doc agent reads PDF/DOCX/TXT → structured summary → email agent sends it.
 
 **StockSummaryCrew** — stock agent fetches live data via yfinance, produces Buy/Hold/Sell analysis per ticker → email agent sends the investment summary.
+
+**InboxSummaryCrew** — inbox summarizer agent reads recent Gmail messages, clusters them by topic, flags action items, saves a plain-text report to `output/`, and optionally emails the report.
 
 **SchedulerCrew** — loads `config/schedule.yaml` on startup, registers APScheduler cron jobs (`coalesce=True`, `max_instances=1`), dispatches to any crew on each tick.
 
@@ -64,11 +69,13 @@ EmailCrew  DocSummary  StockSummary  Scheduler  Streamlit
 | `crews/email_crew.py` | `EmailCrew.run(to, subject, intent, attachments?)` | Draft + send a Gmail email, optionally with file attachments |
 | `crews/doc_summary_crew.py` | `DocSummaryCrew.run(doc_path, recipients, notes?)` | Summarize a document and email the result |
 | `crews/stock_summary_crew.py` | `StockSummaryCrew.run(tickers, recipients)` | Analyze US stocks and email an investment summary |
+| `crews/inbox_summary_crew.py` | `InboxSummaryCrew.run(recipients?, output_dir?, max_emails?)` | Read recent Gmail messages, save a structured summary to `output/`, optionally email it |
 | `crews/scheduler_crew.py` | `SchedulerCrew.start()` | Load `schedule.yaml` and start background cron jobs |
 | `tools/gmail_tool.py` | `GmailSendTool` | Send email via Gmail SMTP (supports attachments) |
 | `tools/gmail_tool.py` | `GmailReadTool` | Read inbox messages via Gmail IMAP |
 | `tools/stock_tool.py` | `StockDataTool` | Fetch live price, valuation, growth, analyst data via yfinance |
 | `tools/doc_reader_tool.py` | `DocReaderTool` | Extract text from PDF, DOCX, TXT (local path or URL) |
+| `tools/report_saver_tool.py` | `ReportSaverTool` | Save a text report to a local `.txt` file with an auto-timestamped filename |
 | `tools/cron_tool.py` | `register_job`, `start_scheduler` | APScheduler wrappers used by `SchedulerCrew` |
 | `db/database.py` | `init_db`, `insert_run`, `update_run`, `get_all_runs` | SQLite CRUD for run tracking |
 | `db/tracker.py` | `track_crew_run(name, job_type, agents, crew)` | Wrap any crew run with automatic DB tracking |
@@ -146,6 +153,31 @@ uv run agent-office stock \
   --ticker AAPL --ticker NVDA --ticker MSFT \
   --to "investor@gmail.com"
 ```
+
+**Read and summarize recent Gmail inbox messages**
+```bash
+# Save report to output/ (default) — no email sent
+uv run agent-office inbox-summary
+
+# Read 20 emails, save to a custom folder
+uv run agent-office inbox-summary --max-emails 20 --output-dir ./reports
+
+# Save locally AND email the report
+uv run agent-office inbox-summary --to "you@gmail.com"
+
+# All options combined
+uv run agent-office inbox-summary \
+  --to "you@gmail.com,team@gmail.com" \
+  --max-emails 15 \
+  --output-dir ./reports
+```
+
+The report is always saved as a `.txt` file under `--output-dir` with a timestamped filename (`inbox_summary_YYYYMMDD_HHMMSS.txt`). The structured report contains:
+
+1. **Overview** — total emails, date range, top senders
+2. **By-Topic Groups** — emails clustered into themes (Finance, HR, Engineering, etc.)
+3. **Action Items** — emails requiring a reply or follow-up
+4. **FYI Only** — informational emails with no action needed
 
 **Start the cron scheduler** (runs until Ctrl+C)
 ```bash
@@ -228,7 +260,7 @@ jobs:
 
 **Cron format:** `minute hour day month day_of_week`
 
-**Supported crew values:** `EmailCrew`, `DocSummaryCrew`, `StockSummaryCrew`
+**Supported crew values:** `EmailCrew`, `DocSummaryCrew`, `StockSummaryCrew`, `InboxSummaryCrew`
 
 ### Run database
 

@@ -1,5 +1,49 @@
 """Unit tests for tools — run with: uv run pytest tests/"""
+import re
 from unittest.mock import MagicMock, patch
+
+# ── ReportSaverTool ──────────────────────────────────────────────────────────
+
+class TestReportSaverTool:
+    def setup_method(self):
+        from agent_office.tools.report_saver_tool import ReportSaverTool
+        self.tool = ReportSaverTool()
+
+    def test_saves_content_to_file(self, tmp_path):
+        result = self.tool._run(content="Hello report", output_dir=str(tmp_path))
+        saved = list(tmp_path.glob("*.txt"))
+        assert len(saved) == 1
+        assert saved[0].read_text() == "Hello report"
+
+    def test_return_contains_absolute_path(self, tmp_path):
+        result = self.tool._run(content="data", output_dir=str(tmp_path))
+        assert "Report saved to:" in result
+        assert str(tmp_path) in result
+
+    def test_default_filename_is_timestamped(self, tmp_path):
+        self.tool._run(content="x", output_dir=str(tmp_path))
+        saved = list(tmp_path.glob("*.txt"))
+        assert re.match(r"inbox_summary_\d{8}_\d{6}\.txt", saved[0].name)
+
+    def test_custom_filename_used(self, tmp_path):
+        self.tool._run(content="y", filename="my_report", output_dir=str(tmp_path))
+        assert (tmp_path / "my_report.txt").exists()
+
+    def test_creates_output_dir_if_missing(self, tmp_path):
+        nested = tmp_path / "a" / "b"
+        self.tool._run(content="z", output_dir=str(nested))
+        assert nested.is_dir()
+        assert len(list(nested.glob("*.txt"))) == 1
+
+    def test_overwrites_existing_file_with_same_name(self, tmp_path):
+        self.tool._run(content="first", filename="report", output_dir=str(tmp_path))
+        self.tool._run(content="second", filename="report", output_dir=str(tmp_path))
+        assert (tmp_path / "report.txt").read_text() == "second"
+
+    def test_empty_content_saves_empty_file(self, tmp_path):
+        self.tool._run(content="", filename="empty", output_dir=str(tmp_path))
+        assert (tmp_path / "empty.txt").read_text() == ""
+
 
 # ── DocReaderTool ─────────────────────────────────────────────────────────────
 

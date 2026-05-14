@@ -11,7 +11,7 @@ class InboxSummaryCrew:
     def run(
         self,
         recipients: list[str] | None = None,
-        output_dir: str = "",
+        output_dir: str = "output",
         max_emails: int = 10,
     ) -> str:
         summary_agent = build_inbox_summary_agent()
